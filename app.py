@@ -30,7 +30,7 @@ info_df = pd.DataFrame(
 
 
 # --------- Upload a file ---------------
-st.subheader("Upload WFDB files (.dat, .hea, .atr)")
+st.subheader("Upload WFDB files (.dat, .hea)")
 
 uploaded_files = st.file_uploader(
     "Upload related WFDB files (example: .hea and .dat file)", 
