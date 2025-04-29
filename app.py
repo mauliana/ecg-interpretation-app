@@ -60,7 +60,8 @@ if uploaded_files:
         record_name = record_names[0]
         
         # Read the record
-        record = wfdb.rdrecord(os.path.join(temp_dir, record_name), sampfrom=0, sampto=1000)
+        # record = wfdb.rdrecord(os.path.join(temp_dir, record_name), sampfrom=0, sampto=1000)
+        record = wfdb.rdrecord(os.path.join(temp_dir, record_name))
         # sampling_rate = record.fs  # safer to take fs from record metadata
         # Try to get sampling rate from file if possible
         try:
@@ -117,7 +118,7 @@ if uploaded_files:
             st.markdown("**ECG Analysis Based on Lead II:** ")
             signal_lead2 = signals[:, 1]
 
-            rythm_type = tool.rythm_analysis(signal_lead2, sampling_rate)
+            rythm_type = tool.rhythm_analysis(signal_lead2, sampling_rate)
             st.write(f"**Rythm type**: {rythm_type}")
 
             st.divider()
