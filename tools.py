@@ -86,8 +86,7 @@ class Tools:
         return fig_all
 
     def avg_heart_rate(self, ecg_signals):
-        avg_hr = ecg_signals["ECG_Rate"].mean()
-        return avg_hr
+        return ecg_signals["ECG_Rate"].mean()   
 
     def clean(self, peaks):
         return np.array(peaks)[~np.isnan(peaks)].astype(int)
@@ -120,25 +119,35 @@ class Tools:
         
         return pr, qrs, qt, qtc, rr
     
-    def rythm_analysis(self, signal, sampling_rate):
+    def compute_rr_intervals(self, r_peaks, sampling_rate):
+        rr_intervals_ms = (np.diff(r_peaks) / sampling_rate) * 1000  # ms
+        rr_mean = np.mean(rr_intervals_ms)
+        rr_variation = np.max(rr_intervals_ms) - np.min(rr_intervals_ms)
+        return rr_intervals_ms, rr_mean, rr_variation
+
+    def detect_rhythm_type(self, hr, rr_mean, rr_variation):
+        if hr < 60 and rr_mean > 1000:
+            return f"Bradycardia \n\nHR: {hr:.2f} bpm (< 60), RR: {int(rr_mean)} ms (> 1000)"
+        elif hr > 250:
+            return f"Atrial Flutter \n\nHR: {hr:.2f} bpm (> 250)"
+        elif hr > 150 and rr_mean < 400:
+            return f"Supraventricular Tachycardia (SVT) \n\nHR: {hr:.2f} bpm (> 150), RR: {int(rr_mean)} ms (< 400)"
+        elif hr > 100 and rr_mean < 600:
+            return f"Tachycardia \n\nHR: {hr:.2f} bpm (> 100), RR: {int(rr_mean)} ms (< 600)"
+        elif 60 <= hr <= 100 and rr_variation > 120:
+            return f"Sinus Arrhythmia \n\nHR: {hr:.2f} bpm (normal), RR variation: {int(rr_variation)} ms (> 120)"
+        else:
+            return f"Normal \n\nHR: {hr:.2f} bpm (60–100), RR: {int(rr_mean)} ms, variation: {int(rr_variation)} ms"
+
+    def rhythm_analysis(self, signal, sampling_rate):
         ecg_signals, info = nk.ecg_process(signal, sampling_rate=sampling_rate)
         hr = self.avg_heart_rate(ecg_signals)
-
         r_peaks = self.clean(info["ECG_R_Peaks"])
 
-        rr = np.mean((np.diff(r_peaks) / sampling_rate) * 1000)
+        rr_intervals, rr_mean, rr_variation = self.compute_rr_intervals(r_peaks, sampling_rate)
+        rhythm_type = self.detect_rhythm_type(hr, rr_mean, rr_variation)
 
-        if hr < 60 and rr > 1000:
-            type = f"Bradycardia \n\n Heart rate is {(hr):.2f} (< 60 bpm) and RR interval {int(rr)} (> 1000 ms)"  
-        elif hr > 250:
-            type = f"Atrial Flutter \n\n Heart rate is {(hr):.2f} (>250 bpm) "
-        elif hr > 150 and rr < 400:
-            type = f"Supraventricular Tachycardia (SVT) \n\n Heart rate is {(hr):.2f} (> 150 bpm) and RR interval {int(rr)} (< 400 ms)"
-        elif hr > 100 and rr < 600:
-            type = f"Tachycardia \n\n Heart rate is {(hr):.2f} (> 100 bpm) and RR interval {int(rr)} (< 600 ms)"
-        else:
-            type = f"Normal \n\nHeart rate is {(hr):.2f} (between 60 - 100 bpm) and RR interval {int(rr)} (between 600 - 1000 ms)"
-        return type
+        return rhythm_type
 
 
         
