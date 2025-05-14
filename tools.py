@@ -1,11 +1,50 @@
 import numpy as np
+import pandas as pd
 import neurokit2 as nk
 import plotly.graph_objects as go
 import plotly.subplots as sp
+import ast
 
 class Tools:
     def __init__(self):
         self.data = None
+    
+    def load_table_info(self):
+        info = pd.DataFrame(
+            {
+                "Parameter": ["Heart Rate (HR)", "PR Interval", "QRS Duration", "QT Interval", "QTc (Corrected QT)"],
+                "Normal Range": ["60 – 100", "120 – 200", "≤ 120", "~350 – 450 (men), ~360 – 460 (women)", "≤ 440 (men), ≤ 460 (women)"],
+                "Unit": ["bpm", "ms", "ms", "ms", "ms"],
+                "Description": [
+                    "Number of heartbeats per minute (<60 = bradycardia, >100 = tachycardia)", 
+                    "Time from atrial depolarization to ventricular depolarization",
+                    "Time of ventricular depolarization (Q to S)",
+                    "Total time for ventricular depolarization + repolarization (Q to T)",
+                    "Heart-rate corrected QT interval (Bazett's Formula)"
+                    ]
+            }
+        )
+        return info
+
+    def load_metadata(self):
+        metadata = pd.read_csv('clean_metadata.csv', index_col='patient_id')
+        return metadata
+    
+    def search_metadata(self, df, filename):
+        rate_type = filename[-2:]
+        column_name = "filename_"+rate_type
+
+        # search data
+        # data = data.loc[data[column_name] == filename]
+        data = df[df[column_name].str.contains(filename, case=False, na=False)]
+        result = data.copy()
+        result['sex'] = result['sex'].map({0: 'Male', 1: 'Female'})
+        
+        # get the class
+        diag_class = ast.literal_eval(result['diagnostic_superclass'].iloc[0])
+
+        result = result.drop(columns=['filename_lr', 'filename_hr', 'strat_fold','diagnostic_superclass', 'scp_codes'])
+        return diag_class[0], result
 
     def plot_ecg_with_peaks(self, signal, sampling_rate, info, lead_name="Lead II", title=None):
         """
@@ -148,6 +187,56 @@ class Tools:
         rhythm_type = self.detect_rhythm_type(hr, rr_mean, rr_variation)
 
         return rhythm_type
+    
+    def st_segment_analysis(self, signals, lead_names, age, gender, sampling_rate):
+        v_threshold = 0.2 if gender == "Male" and age >= 40 else 0.25 if gender == "Male" else 0.15
+        elev_threshold = 0.1
+        dep_threshold = 0.05
+
+        for index, lead_name in enumerate(lead_names):
+            signal = signals[:, index]
+            ecg_cleaned = nk.ecg_clean(signal, sampling_rate=sampling_rate)
+            _, rpeaks = nk.ecg_peaks(ecg_cleaned, sampling_rate=sampling_rate)
+            _, waves = nk.ecg_delineate(ecg_cleaned, rpeaks, sampling_rate=sampling_rate, method="dwt")
+
+            # Time axis
+            time = np.arange(len(ecg_cleaned)) / sampling_rate * 1000
+
+            threshold = v_threshold if lead_name in ["V2", "V3"] else elev_threshold
+
+            baseline_points = []
+            duration = []
+
+            for i in range(len(rpeaks['ECG_R_Peaks'])):
+                try:
+                    q_onset = int(waves["ECG_Q_Peaks"][i]) if not np.isnan(waves["ECG_Q_Peaks"][i]) else None
+                    r_offset = int(waves["ECG_R_Offsets"][i]) if not np.isnan(waves["ECG_R_Offsets"][i]) else None
+                    p_offset = int(waves["ECG_P_Offsets"][i]) if not np.isnan(waves["ECG_P_Offsets"][i]) else None
+                    t_onset = int(waves["ECG_T_Onsets"][i]) if not np.isnan(waves["ECG_T_Onsets"][i]) else None
+
+                    if None in (q_onset, r_offset, t_onset) or r_offset >= t_onset:
+                        continue
+
+                    # Baseline: 40 ms before Q onset (typical PR segment)
+                    baseline_start = max(0, q_onset - int(0.04 * sampling_rate))
+                    baseline_end = q_onset
+                    baseline_mean = np.mean(ecg_cleaned[baseline_start:baseline_end])
+                    baseline_points.append(baseline_mean)
+
+                    # ST segment: from J (R offset) to T onset
+                    st_segment = ecg_cleaned[r_offset:t_onset]
+                    st_mean = np.mean(st_segment)
+
+                    # Compare ST to baseline
+                    deviation = st_mean - baseline_mean
+
+                    
+                except Exception:
+                    continue
+
+
+        return 0
+    
 
 
         

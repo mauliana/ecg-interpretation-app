@@ -13,21 +13,10 @@ tool = Tools()
 st.set_page_config(layout="wide")
 st.title("ECG Interpretation app")
 
-info_df = pd.DataFrame(
-    {
-        "Parameter": ["Heart Rate (HR)", "PR Interval", "QRS Duration", "QT Interval", "QTc (Corrected QT)"],
-        "Normal Range": ["60 – 100", "120 – 200", "≤ 120", "~350 – 450 (men), ~360 – 460 (women)", "≤ 440 (men), ≤ 460 (women)"],
-        "Unit": ["bpm", "ms", "ms", "ms", "ms"],
-        "Description": [
-            "Number of heartbeats per minute (<60 = bradycardia, >100 = tachycardia)", 
-            "Time from atrial depolarization to ventricular depolarization",
-            "Time of ventricular depolarization (Q to S)",
-            "Total time for ventricular depolarization + repolarization (Q to T)",
-            "Heart-rate corrected QT interval (Bazett's Formula)"
-            ]
-    }
-)
+info_df = tool.load_table_info()
 
+# Load patient metadata (a sample of recorded patient data saved in csv)
+metadata = tool.load_metadata()
 
 # --------- Upload a file ---------------
 st.subheader("Upload WFDB files (.dat, .hea)")
@@ -36,13 +25,6 @@ uploaded_files = st.file_uploader(
     "Upload related WFDB files (example: .hea and .dat file)", 
     type=["hea", "dat"], 
     accept_multiple_files=True
-)
-
-# --------- Sampling rate selection (new) ------------
-sampling_rate = st.selectbox(
-    "Select Sampling Rate (Hz)",
-    options=[100, 500],
-    index=0  # default to 100 Hz
 )
 
 if uploaded_files:
@@ -69,8 +51,23 @@ if uploaded_files:
             st.success(f"Detected sampling rate from file: {sampling_rate_record} Hz")
             sampling_rate = sampling_rate_record
         except:
-            st.warning(f"Failed to detect sampling rate from file, using selected: {sampling_rate} Hz")
+            sampling_rate = st.selectbox(
+                "Select Sampling Rate (Hz)",
+                options=[100, 500],
+                index=0  # default to 100 Hz
+            )
+            st.warning(f"Failed to detect sampling rate from file, select sampling rate")
 
+        st.subheader("Patient Data")
+        
+        # get patient data
+        diagnostic_class, patient_data = tool.search_metadata(metadata,record_name)
+
+        st.write(f"**Patient Id:** {patient_data.index[0]}")
+        st.write(f"**Age:** {patient_data["age"].iloc[0]}")
+        st.write(f"**Gender:** {patient_data["sex"].iloc[0]}")
+        st.write(f"**Recording data:** {patient_data["recording_date"].iloc[0]}")
+        st.divider()
 
         signals = record.p_signal
         n_leads = signals.shape[1]
@@ -123,7 +120,9 @@ if uploaded_files:
 
             st.divider()
             
-            st.markdown("**ECG Diagnostic Class:** :blue-background[Normal] / :red-background[Hypertrophy] / :green-background[STTC] / :grey-background[CD]")
+            st.markdown(f"**ECG Diagnostic Class:** :blue-background[{diagnostic_class}]")
+            # st.markdown("**ECG Diagnostic Class:** :blue-background[Normal] / :red-background[Hypertrophy] / :green-background[STTC] / :grey-background[CD]")
+
     else:
         st.error("Please upload the matching .dat and .hea files for a single record.")
 
