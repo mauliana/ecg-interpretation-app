@@ -4,20 +4,23 @@ import neurokit2 as nk
 import plotly.graph_objects as go
 import plotly.subplots as sp
 import ast
+from mi import MI
 
 class Tools:
     def __init__(self):
         self.data = None
+        self.mi = MI()
     
     def load_table_info(self):
         info = pd.DataFrame(
             {
-                "Parameter": ["Heart Rate (HR)", "PR Interval", "QRS Duration", "QT Interval", "QTc (Corrected QT)"],
-                "Normal Range": ["60 – 100", "120 – 200", "≤ 120", "~350 – 450 (men), ~360 – 460 (women)", "≤ 440 (men), ≤ 460 (women)"],
-                "Unit": ["bpm", "ms", "ms", "ms", "ms"],
+                "Parameter": ["Heart Rate (HR)", "PR Interval", "RR Interval", "QRS Duration", "QT Interval", "QTc (Corrected QT)"],
+                "Normal Range": ["60 – 100", "120 – 200", "600 - 1000", "≤ 120", "~350 – 450 (men), ~360 – 460 (women)", "≤ 440 (men), ≤ 460 (women)"],
+                "Unit": ["bpm", "ms", "ms", "ms", "ms", "ms"],
                 "Description": [
                     "Number of heartbeats per minute (<60 = bradycardia, >100 = tachycardia)", 
                     "Time from atrial depolarization to ventricular depolarization",
+                    "Time measure between two consecutive R waves",
                     "Time of ventricular depolarization (Q to S)",
                     "Total time for ventricular depolarization + repolarization (Q to T)",
                     "Heart-rate corrected QT interval (Bazett's Formula)"
@@ -41,10 +44,10 @@ class Tools:
         result['sex'] = result['sex'].map({0: 'Male', 1: 'Female'})
         
         # get the class
-        diag_class = ast.literal_eval(result['diagnostic_superclass'].iloc[0])
+        # diag_class = ast.literal_eval(result['diagnostic_superclass'])
 
-        result = result.drop(columns=['filename_lr', 'filename_hr', 'strat_fold','diagnostic_superclass', 'scp_codes'])
-        return diag_class[0], result
+        result = result.drop(columns=['filename_lr', 'filename_hr', 'strat_fold', 'scp_codes'])
+        return result
 
     def plot_ecg_with_peaks(self, signal, sampling_rate, info, lead_name="Lead II", title=None):
         """
@@ -124,119 +127,213 @@ class Tools:
         )
         return fig_all
 
-    def avg_heart_rate(self, ecg_signals):
-        return ecg_signals["ECG_Rate"].mean()   
-
     def clean(self, peaks):
         return np.array(peaks)[~np.isnan(peaks)].astype(int)
-
-    def calculate_interval(self, ecg_signals, info, sampling_rate):
-        p_peaks = self.clean(info["ECG_P_Peaks"])
-        r_peaks = self.clean(info["ECG_R_Peaks"])
-        q_peaks = self.clean(info["ECG_Q_Peaks"])
-        s_peaks = self.clean(info["ECG_S_Peaks"])
-        t_peaks = self.clean(info["ECG_T_Peaks"])
-
-        # Align arrays (just match each P to its following R)
-        min_len = min(len(p_peaks), len(r_peaks), len(t_peaks), len(q_peaks))
-        pr_interval = (r_peaks[:min_len] - p_peaks[:min_len]) / sampling_rate * 1000  # in ms
-        qrs_interval = (s_peaks[:min_len] - q_peaks[:min_len]) / sampling_rate * 1000
-        qt_interval = (t_peaks[:min_len] - q_peaks[:min_len]) / sampling_rate * 1000
-
-        QT_sec = (t_peaks[:min_len] - q_peaks[:min_len]) / sampling_rate
-        RR_sec = np.diff(r_peaks[:min_len+1]) / sampling_rate
-        RR_ms = RR_sec * 1000
-
-        QTc = QT_sec[:len(RR_sec)] / np.sqrt(RR_sec)  # Still in seconds
-        QTc_ms = QTc * 1000  # Convert to ms if needed
-
-        pr = f"PR interval: {np.mean(pr_interval):.2f} ms"
-        qrs = f"QRS interval: {np.mean(qrs_interval):.2f} ms"
-        qt = f"QT interval: {np.mean(qt_interval):.2f} ms"
-        rr = f"RR interval: {np.mean(RR_ms):.2f} ms"
-        qtc = f"QTc interval: {np.mean(QTc_ms):.2f} ms"
-        
-        return pr, qrs, qt, qtc, rr
     
-    def compute_rr_intervals(self, r_peaks, sampling_rate):
-        rr_intervals_ms = (np.diff(r_peaks) / sampling_rate) * 1000  # ms
-        rr_mean = np.mean(rr_intervals_ms)
-        rr_variation = np.max(rr_intervals_ms) - np.min(rr_intervals_ms)
-        return rr_intervals_ms, rr_mean, rr_variation
+    def plot_lead(self, ecg_cleaned, time, waves, rpeaks, lead_name, sampling_rate, lead_status, v_threshold):
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=time, y=ecg_cleaned, mode='lines', name='ECG Signal'))
 
-    def detect_rhythm_type(self, hr, rr_mean, rr_variation):
-        if hr < 60 and rr_mean > 1000:
-            return f"Bradycardia \n\nHR: {hr:.2f} bpm (< 60), RR: {int(rr_mean)} ms (> 1000)"
-        elif hr > 250:
-            return f"Atrial Flutter \n\nHR: {hr:.2f} bpm (> 250)"
-        elif hr > 150 and rr_mean < 400:
-            return f"Supraventricular Tachycardia (SVT) \n\nHR: {hr:.2f} bpm (> 150), RR: {int(rr_mean)} ms (< 400)"
-        elif hr > 100 and rr_mean < 600:
-            return f"Tachycardia \n\nHR: {hr:.2f} bpm (> 100), RR: {int(rr_mean)} ms (< 600)"
-        elif 60 <= hr <= 100 and rr_variation > 120:
-            return f"Sinus Arrhythmia \n\nHR: {hr:.2f} bpm (normal), RR variation: {int(rr_variation)} ms (> 120)"
-        else:
-            return f"Normal \n\nHR: {hr:.2f} bpm (60–100), RR: {int(rr_mean)} ms, variation: {int(rr_variation)} ms"
+        # --------- Global baseline ---------------
+        g_baseline = self.mi.global_baseline(ecg_cleaned, sampling_rate, waves, rpeaks)
+        if g_baseline != 0:
+            fig.add_trace(go.Scatter(
+                x=time,
+                y=[g_baseline] * len(time),
+                mode='lines',
+                line=dict(color='black', width=1, dash='dash'),
+                name="Global Baseline (PR segment)",
+                showlegend=True
+            ))
 
-    def rhythm_analysis(self, signal, sampling_rate):
-        ecg_signals, info = nk.ecg_process(signal, sampling_rate=sampling_rate)
-        hr = self.avg_heart_rate(ecg_signals)
-        r_peaks = self.clean(info["ECG_R_Peaks"])
+        elev_threshold = v_threshold if lead_name in ["V2", "V3"] else 0.1
+        depression_threshold = 0.05
+        added_legend = {"elevation": False, "depression": False, "jpoint": False, "st-point": False,
+                        "qpeak": False, "rpeak": False, "speak": False, "tpeak":False,"ppeak": False}
 
-        rr_intervals, rr_mean, rr_variation = self.compute_rr_intervals(r_peaks, sampling_rate)
-        rhythm_type = self.detect_rhythm_type(hr, rr_mean, rr_variation)
-
-        return rhythm_type
-    
-    def st_segment_analysis(self, signals, lead_names, age, gender, sampling_rate):
-        v_threshold = 0.2 if gender == "Male" and age >= 40 else 0.25 if gender == "Male" else 0.15
-        elev_threshold = 0.1
-        dep_threshold = 0.05
-
-        for index, lead_name in enumerate(lead_names):
-            signal = signals[:, index]
-            ecg_cleaned = nk.ecg_clean(signal, sampling_rate=sampling_rate)
-            _, rpeaks = nk.ecg_peaks(ecg_cleaned, sampling_rate=sampling_rate)
-            _, waves = nk.ecg_delineate(ecg_cleaned, rpeaks, sampling_rate=sampling_rate, method="dwt")
-
-            # Time axis
-            time = np.arange(len(ecg_cleaned)) / sampling_rate * 1000
-
-            threshold = v_threshold if lead_name in ["V2", "V3"] else elev_threshold
-
-            baseline_points = []
-            duration = []
-
-            for i in range(len(rpeaks['ECG_R_Peaks'])):
-                try:
-                    q_onset = int(waves["ECG_Q_Peaks"][i]) if not np.isnan(waves["ECG_Q_Peaks"][i]) else None
-                    r_offset = int(waves["ECG_R_Offsets"][i]) if not np.isnan(waves["ECG_R_Offsets"][i]) else None
-                    p_offset = int(waves["ECG_P_Offsets"][i]) if not np.isnan(waves["ECG_P_Offsets"][i]) else None
-                    t_onset = int(waves["ECG_T_Onsets"][i]) if not np.isnan(waves["ECG_T_Onsets"][i]) else None
-
-                    if None in (q_onset, r_offset, t_onset) or r_offset >= t_onset:
-                        continue
-
-                    # Baseline: 40 ms before Q onset (typical PR segment)
-                    baseline_start = max(0, q_onset - int(0.04 * sampling_rate))
-                    baseline_end = q_onset
-                    baseline_mean = np.mean(ecg_cleaned[baseline_start:baseline_end])
-                    baseline_points.append(baseline_mean)
-
-                    # ST segment: from J (R offset) to T onset
-                    st_segment = ecg_cleaned[r_offset:t_onset]
-                    st_mean = np.mean(st_segment)
-
-                    # Compare ST to baseline
-                    deviation = st_mean - baseline_mean
-
-                    
-                except Exception:
+        for i in range(len(rpeaks["ECG_R_Peaks"])):
+            try:
+                r_idx = int(rpeaks["ECG_R_Peaks"][i])
+                if r_idx >= len(ecg_cleaned):
                     continue
 
+                # --- Q Peak ---
+                q_peak = int(waves["ECG_Q_Peaks"][i]) if not np.isnan(waves["ECG_Q_Peaks"][i]) else None
+                if q_peak is not None and q_peak < len(ecg_cleaned):
+                    fig.add_trace(go.Scatter(
+                        x=[time[q_peak]],
+                        y=[ecg_cleaned[q_peak]],
+                        mode='markers+text',
+                        marker=dict(color='blue', size=7, symbol='triangle-up'),
+                        text=["Q"],
+                        textposition="top center",
+                        name="Q peak" if not added_legend["qpeak"] else "",
+                        showlegend=not added_legend["qpeak"]
+                    ))
+                    added_legend["qpeak"] = True
 
-        return 0
-    
+                # --- R Peak ---
+                fig.add_trace(go.Scatter(
+                    x=[time[r_idx]],
+                    y=[ecg_cleaned[r_idx]],
+                    mode='markers+text',
+                    marker=dict(color='purple', size=7, symbol='diamond'),
+                    text=["R"],
+                    textposition="top center",
+                    name="R peak" if not added_legend["rpeak"] else "",
+                    showlegend=not added_legend["rpeak"]
+                ))
+                added_legend["rpeak"] = True
 
+                # --- S Peak ---
+                s_peak = int(waves["ECG_S_Peaks"][i]) if not np.isnan(waves["ECG_S_Peaks"][i]) else None
+                if s_peak is not None and s_peak < len(ecg_cleaned):
+                    fig.add_trace(go.Scatter(
+                        x=[time[s_peak]],
+                        y=[ecg_cleaned[s_peak]],
+                        mode='markers+text',
+                        marker=dict(color='orange', size=7, symbol='triangle-down'),
+                        text=["S"],
+                        textposition="bottom center",
+                        name="S peak" if not added_legend["speak"] else "",
+                        showlegend=not added_legend["speak"]
+                    ))
+                    added_legend["speak"] = True
 
-        
+                # --- T Peak ---
+                t_peak = int(waves["ECG_T_Peaks"][i]) if not np.isnan(waves["ECG_T_Peaks"][i]) else None
+                if t_peak is not None and t_peak < len(ecg_cleaned):
+                    fig.add_trace(go.Scatter(
+                        x=[time[t_peak]],
+                        y=[ecg_cleaned[t_peak]],
+                        mode='markers+text',
+                        marker=dict(color='green', size=7),
+                        text=["T"],
+                        textposition="top center",
+                        name="T peak" if not added_legend["tpeak"] else "",
+                        showlegend=not added_legend["tpeak"]
+                    ))
+                    added_legend["tpeak"] = True
+
+                # --- P Peak ---
+                p_peak = int(waves["ECG_P_Peaks"][i]) if not np.isnan(waves["ECG_P_Peaks"][i]) else None
+                if p_peak is not None and p_peak < len(ecg_cleaned):
+                    fig.add_trace(go.Scatter(
+                        x=[time[p_peak]],
+                        y=[ecg_cleaned[p_peak]],
+                        mode='markers+text',
+                        marker=dict(color='pink', size=7),
+                        text=["P"],
+                        textposition="top center",
+                        name="P peak" if not added_legend["ppeak"] else "",
+                        showlegend=not added_legend["ppeak"]
+                    ))
+                    added_legend["ppeak"] = True
+
+                # --- J point ---
+                j_point = int(waves["ECG_R_Offsets"][i]) if not np.isnan(waves["ECG_R_Offsets"][i]) else None
+                if j_point is None or j_point >= len(ecg_cleaned):
+                    continue
+
+                fig.add_trace(go.Scatter(
+                    x=[time[j_point]],
+                    y=[ecg_cleaned[j_point]],
+                    mode='markers+text',
+                    marker=dict(color='gray', size=7),
+                    text=["J"],
+                    textposition="top center",
+                    name="J point" if not added_legend["jpoint"] else "",
+                    showlegend=not added_legend["jpoint"]
+                ))
+                added_legend["jpoint"] = True
+
+                # --- Baseline from PR segment ---
+                p_offset = int(waves["ECG_P_Offsets"][i]) if not np.isnan(waves["ECG_P_Offsets"][i]) else None
+                q_peak = int(waves["ECG_Q_Peaks"][i]) if not np.isnan(waves["ECG_Q_Peaks"][i]) else None
+                if q_peak is None or q_peak >= len(ecg_cleaned):
+                    continue
+
+                baseline_start = p_offset if (p_offset is not None and p_offset < q_peak) else max(0, q_peak - int(0.04 * sampling_rate))
+                baseline_end = q_peak
+
+                baseline_window = ecg_cleaned[baseline_start:baseline_end]
+                if len(baseline_window) == 0:
+                    continue
+
+                baseline_mean = np.mean(baseline_window)
+
+                # --- ST value at 80ms after J-point ---
+                st_eval_offset = j_point + int(0.08 * sampling_rate)
+                if st_eval_offset >= len(ecg_cleaned):
+                    continue
+
+                st_value = ecg_cleaned[st_eval_offset]
+                deviation = st_value - baseline_mean
+
+                # --- Optional: Mark ST eval point at 80ms ---
+                fig.add_trace(go.Scatter(
+                    x=[time[st_eval_offset]],
+                    y=[st_value],
+                    mode='markers+text',
+                    marker=dict(color='blue', size=6),
+                    # text=["ST@80ms"],
+                    textposition="bottom center",
+                    name="ST eval point (80 ms)" if not added_legend["st-point"] else "",
+                    showlegend=not added_legend["st-point"]
+                ))
+                added_legend["st-point"] = True
+
+                if deviation >= elev_threshold:
+                    color, fill, name = 'red', 'rgba(255,0,0,0.2)', "ST Elevation"
+                    show_legend = not added_legend["elevation"]
+                    added_legend["elevation"] = True
+                elif deviation <= -depression_threshold:
+                    color, fill, name = 'green', 'rgba(0,255,0,0.2)', "ST Depression"
+                    show_legend = not added_legend["depression"]
+                    added_legend["depression"] = True
+                else:
+                    continue  # No elevation/depression
+
+                # --- Always visualize 80ms of ST segment after J-point ---
+                st_duration_samples = int(0.08 * sampling_rate)
+                t_onset = min(j_point + st_duration_samples, len(ecg_cleaned) - 1)
+
+                x_vals = list(time[j_point:t_onset])
+                y_vals = list(ecg_cleaned[j_point:t_onset])
+
+                x_poly = x_vals + x_vals[::-1]
+                y_poly = y_vals + [baseline_mean] * len(y_vals)
+
+                fig.add_trace(go.Scatter(
+                    x=x_poly,
+                    y=y_poly,
+                    mode='lines',
+                    line=dict(color=color),
+                    fill='toself',
+                    fillcolor=fill,
+                    name=name,
+                    showlegend=show_legend
+                ))
+
+                fig.add_trace(go.Scatter(
+                    x=x_vals,
+                    y=y_vals,
+                    mode='lines',
+                    line=dict(color=color, width=1),
+                    name=name,
+                    showlegend=False
+                ))
+
+            except Exception as e:
+                print(f"Error in beat {i}: {e}")
+                continue
+
+        fig.update_layout(
+            title=f"Lead {lead_name}",
+            xaxis_title="Time (ms)",
+            yaxis_title="Amplitude (mV)",
+            template="plotly_white",
+            legend=dict(orientation="h", y=-0.2)
+        )
+
+        return fig

@@ -5,10 +5,15 @@ import numpy as np
 import pandas as pd
 import tempfile
 import os
+from collections import defaultdict
 from tools import Tools
+from mi import MI
+from arrhytmia import Arrhytmia
 
-# Create a Tools instance
+# Create a object instance
 tool = Tools()
+mi = MI()
+arr = Arrhytmia()
 
 st.set_page_config(layout="wide")
 st.title("ECG Interpretation app")
@@ -61,7 +66,7 @@ if uploaded_files:
         st.subheader("Patient Data")
         
         # get patient data
-        diagnostic_class, patient_data = tool.search_metadata(metadata,record_name)
+        patient_data = tool.search_metadata(metadata,record_name)
 
         st.write(f"**Patient Id:** {patient_data.index[0]}")
         st.write(f"**Age:** {patient_data["age"].iloc[0]}")
@@ -80,49 +85,84 @@ if uploaded_files:
 
         # ----------------- Select a Lead to Explore in Detail -----------------
         st.subheader("Inspect a Specific Lead with Detected Peaks")
+
+        # Analyze once
+        df_status, lead_plot_data = mi.analyze_all_leads(patient_data, signals, lead_names, sampling_rate)
+
         selected_lead = st.selectbox("Select Lead to Inspect", lead_names)
 
+        # Get data for plot
+        ecg_cleaned, time, waves, rpeaks, lead_status, v_threshold = lead_plot_data[selected_lead]
+        
         selected_index = lead_names.index(selected_lead)
         signal = signals[:, selected_index]
+
         ecg_signals, info = nk.ecg_process(signal, sampling_rate=sampling_rate)
 
-
-        # # ---- Plotly ECG plot with peaks ----
-        col1, col2 = st.columns([3, 1])
+        # plot = tool.plot_ecg_with_peaks(signal, sampling_rate, info, lead_name=selected_lead)
+        plot = tool.plot_lead(ecg_cleaned, time, waves, rpeaks, selected_lead, sampling_rate, lead_status, v_threshold)
+        st.plotly_chart(plot, use_container_width=True)
+        
+        col1, col2 = st.columns([3, 2])
 
         with col1:
-            st.write(f"This plot shows P, Q, R, S, T peaks detected from Lead {selected_lead} ECG signal.")
-            plot = tool.plot_ecg_with_peaks(signal, sampling_rate, info, lead_name=selected_lead)
-            st.plotly_chart(plot, use_container_width=True)
+            subcol1, subcol2 = st.columns([3,2])
+            with subcol1:
+                st.markdown("**Signal Reading Based on Selected Signal:**")
+                interval = arr.calculate_interval(ecg_signals, info, sampling_rate, patient_data["sex"].iloc[0])
+                st.dataframe(interval, hide_index=True)
+            with subcol2:
+                st.markdown("**ECG Analysis Based on Lead II:** ")
+                signal_lead2 = signals[:, 1]
+
+                rythm_type = arr.rhythm_analysis(signal_lead2, sampling_rate)
+                st.write(f"**Rythm type**: {rythm_type}")
+
+                st.divider()
+                
+                st.markdown(f"**ECG Diagnostic Class:** :blue-background[{patient_data["diagnostic_superclass"].values}]")
 
             with st.expander("See explanation of signal reading"):
                 st.dataframe(info_df, hide_index=True)
+            
 
         with col2:
-            st.subheader("Signal Reading:")
-            avg_hr = tool.avg_heart_rate(ecg_signals)
-            hr = f"Average Heart Rate: {avg_hr:.2f} bpm"
-            st.write(hr)
+            st.markdown("**MI Diagnose:**")
+            # Check for MI regions
+            contiguous_results = mi.identify_contiguous_regions(df_status)
 
-            pr, qrs, qt, qtc, rr = tool.calculate_interval(ecg_signals, info, sampling_rate)
-            st.write(pr)
-            st.write(qrs)
-            st.write(qt)
-            st.write(qtc)
-            st.write(rr)
+            # Group detected leads by region
+            grouped_results = defaultdict(list)
+            for region, leads in contiguous_results:
+                grouped_results[region].append(leads)
 
-            st.divider()
-            st.markdown("**ECG Analysis Based on Lead II:** ")
-            signal_lead2 = signals[:, 1]
-
-            rythm_type = tool.rhythm_analysis(signal_lead2, sampling_rate)
-            st.write(f"**Rythm type**: {rythm_type}")
-
-            st.divider()
+            if grouped_results:
+                for region, leads_list in grouped_results.items():
+                    if region == "Anterior":
+                        st.write(f"**{region}** Left Anterior Descending (LAD)")
+                    elif region == "Anteroseptal":
+                        st.write(f"**{region}** LAD (proximal)")
+                    elif region == "Anterolateral":
+                        st.write(f"**{region}** LAD or Left Circumflex")
+                    elif region == "Lateral":
+                        st.write(f"**{region}** Left Circumflex")
+                    elif region == "High Lateral":
+                        st.write(f"**{region}** Left Circumflex (high branch)")
+                    elif region == "Inferior":
+                        st.write("Right Coronary Artery (RCA) or Left Circumflex")
+                    elif region == "Posterior":
+                        st.write(f"**{region}** Posterior descending (RCA or Circumflex)")
+                    
+                    # Print all lead combinations for this region
+                    # for leads in leads_list:
+                    #     st.markdown(f"- {', '.join(sorted(leads))}")
+                    st.markdown(leads_list)
+            else:
+                st.info("No ST elevation or depression in defined contiguous lead groups.")
             
-            st.markdown(f"**ECG Diagnostic Class:** :blue-background[{diagnostic_class}]")
-            # st.markdown("**ECG Diagnostic Class:** :blue-background[Normal] / :red-background[Hypertrophy] / :green-background[STTC] / :grey-background[CD]")
-
+            # Show full result table
+            st.markdown("**Detail information:**")
+            st.dataframe(df_status)
     else:
         st.error("Please upload the matching .dat and .hea files for a single record.")
 
