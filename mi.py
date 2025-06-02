@@ -171,29 +171,27 @@ class MI:
 
         for i in range(len(rpeaks['ECG_R_Peaks'])):
             try:
-                def safe_get(wave_name):
-                    val = waves.get(wave_name, [None] * len(rpeaks['ECG_R_Peaks']))[i]
-                    return int(val) if val is not None and not np.isnan(val) else None
+                # Skip this beat if required delineation points are missing or invalid
+                required_keys = [
+                    "ECG_Q_Peaks", "ECG_R_Offsets", "ECG_T_Onsets",
+                    "ECG_S_Peaks", "ECG_T_Peaks", "ECG_P_Offsets"
+                ]
+                if any(k not in waves or i >= len(waves[k]) or np.isnan(waves[k][i]) for k in required_keys):
+                    continue
 
-                q_peak = safe_get("ECG_Q_Peaks")
-                r_offset = safe_get("ECG_R_Offsets")
-                t_onset = safe_get("ECG_T_Onsets")
-                t_peak = safe_get("ECG_T_Peaks")
-                s_peak = safe_get("ECG_S_Peaks")
-                p_offset = safe_get("ECG_P_Offsets")
-
+                q_peak = int(waves["ECG_Q_Peaks"][i])
+                r_offset = int(waves["ECG_R_Offsets"][i])
+                t_onset = int(waves["ECG_T_Onsets"][i])
+                s_peak = int(waves["ECG_S_Peaks"][i])
+                t_peak = int(waves["ECG_T_Peaks"][i])
+                p_offset = int(waves["ECG_P_Offsets"][i])
                 r_peak = int(rpeaks['ECG_R_Peaks'][i])
 
-                if None in (q_peak, r_offset, t_peak) or r_offset >= t_onset:
+                if r_offset >= t_onset:
                     continue
 
                 # Baseline: use PR segment if p_offset is valid, else fallback to Q-peak - 40ms
-                p_offset = int(waves["ECG_P_Offsets"][i]) if not np.isnan(waves["ECG_P_Offsets"][i]) else None
-                q_peak = int(waves["ECG_Q_Peaks"][i]) if not np.isnan(waves["ECG_Q_Peaks"][i]) else None
-                if q_peak is None or q_peak >= len(ecg_cleaned):
-                    continue
-
-                baseline_start = p_offset if (p_offset is not None and p_offset < q_peak) else max(0, q_peak - int(0.04 * sampling_rate))
+                baseline_start = p_offset if (p_offset < q_peak) else max(0, q_peak - int(0.04 * sampling_rate))
                 baseline_end = q_peak
 
                 baseline_window = ecg_cleaned[baseline_start:baseline_end]
@@ -216,7 +214,6 @@ class MI:
 
                 st_value = ecg_cleaned[st_offset]
                 deviation = st_value - baseline_mean
-                # deviation = st_value - global_baseline
                 if deviation >= threshold:
                     duration.append(t_onset - r_offset)
                     findings.append("elevation")
@@ -225,8 +222,6 @@ class MI:
                     findings.append("depression")
 
                 # T-wave inversion
-                # t_amplitude = ecg_cleaned[t_peak]
-                # if t_amplitude < (baseline_mean + t_inversion_threshold):
                 if t_peak < t_onset:
                     t_diff = t_onset - t_peak
                     if t_diff >= t_inversion_threshold:
@@ -234,16 +229,12 @@ class MI:
                         findings.append("t_inversion")
 
                 # R/S ratio using (R - Q) / (R - S)
-                if s_peak is not None and q_peak is not None:
-                    q_amplitude = ecg_cleaned[q_peak]
-                    s_amplitude = ecg_cleaned[s_peak]
+                qr_amp_diff = ecg_cleaned[r_peak] - ecg_cleaned[q_peak]
+                rs_amp_diff = ecg_cleaned[r_peak] - ecg_cleaned[s_peak]
 
-                    qr_amp_diff = r_amplitude - (q_amplitude - baseline_mean)
-                    rs_amp_diff = r_amplitude - (s_amplitude - baseline_mean)
-
-                    if rs_amp_diff != 0:
-                        rs_ratio = qr_amp_diff / abs(rs_amp_diff)
-                        rs_ratios.append(rs_ratio)
+                if rs_amp_diff != 0:
+                    rs_ratio = qr_amp_diff / abs(rs_amp_diff)
+                    rs_ratios.append(rs_ratio)
 
             except Exception as e:
                 print(f"[Warning] Skipping beat {i} due to error: {e}")

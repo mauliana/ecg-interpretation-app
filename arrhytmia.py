@@ -152,7 +152,8 @@ class Arrhytmia:
             elif hr > 300 and reg_rr == False:
                 type = "Ventricular Fibrillation (VF)"
         
-        
+        if type == "":
+            type = "Undefined Rhythm"
         # rr_intervals, rr_mean, rr_std, rr_variation, rr_cv = self.compute_rr_intervals(r_peaks, sampling_rate)
 
         # rhythm_type = self.detect_rhythm_type(hr, rr_mean, rr_std, rr_variation, rr_cv)

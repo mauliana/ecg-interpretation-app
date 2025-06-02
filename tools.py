@@ -151,6 +151,7 @@ class Tools:
         added_legend = {"elevation": False, "depression": False, "jpoint": False, "st-point": False,
                         "qpeak": False, "rpeak": False, "speak": False, "tpeak":False,"ppeak": False}
 
+        # print(f"plot threshold {lead_name}: {elev_threshold}")
         for i in range(len(rpeaks["ECG_R_Peaks"])):
             try:
                 r_idx = int(rpeaks["ECG_R_Peaks"][i])
@@ -184,6 +185,21 @@ class Tools:
                     showlegend=not added_legend["rpeak"]
                 ))
                 added_legend["rpeak"] = True
+
+                # --- Prominent R ---
+                prom_threshold = 0.7 if lead_name in ["V1", "V2", "V3"] else 1.5
+                if ecg_cleaned[r_idx] > prom_threshold:
+                    fig.add_trace(go.Scatter(
+                        x=[time[r_idx]],
+                        y=[ecg_cleaned[r_idx]],
+                        mode='markers+text',
+                        marker=dict(color='yellow', size=10, symbol='star'),
+                        text=["Prominent R"],
+                        textposition="bottom center",
+                        name=f"Prominent R ({lead_name})" if not added_legend.get("prominent_r_" + lead_name, False) else "",
+                        showlegend=not added_legend.get("prominent_r_" + lead_name, False)
+                    ))
+                    added_legend["prominent_r_" + lead_name] = True
 
                 # --- S Peak ---
                 s_peak = int(waves["ECG_S_Peaks"][i]) if not np.isnan(waves["ECG_S_Peaks"][i]) else None
@@ -232,6 +248,7 @@ class Tools:
 
                 # --- J point ---
                 j_point = int(waves["ECG_R_Offsets"][i]) if not np.isnan(waves["ECG_R_Offsets"][i]) else None
+                # j_point = s_peak
                 if j_point is None or j_point >= len(ecg_cleaned):
                     continue
 
@@ -269,6 +286,7 @@ class Tools:
 
                 st_value = ecg_cleaned[st_eval_offset]
                 deviation = st_value - baseline_mean
+                # deviation = st_value - g_baseline
 
                 # --- Optional: Mark ST eval point at 80ms ---
                 fig.add_trace(go.Scatter(
@@ -328,12 +346,65 @@ class Tools:
                 print(f"Error in beat {i}: {e}")
                 continue
 
+        # fig.update_layout(
+        #     title=f"Lead {lead_name}",
+        #     xaxis_title="Time (ms)",
+        #     yaxis_title="Amplitude (mV)",
+        #     template="plotly_white",
+        #     legend=dict(orientation="h", y=-0.2)
+        # )
+
+        y_margin = 0.1
+        y_min = min(ecg_cleaned) - y_margin
+        y_max = max(ecg_cleaned) + y_margin
+
         fig.update_layout(
             title=f"Lead {lead_name}",
             xaxis_title="Time (ms)",
             yaxis_title="Amplitude (mV)",
-            template="plotly_white",
-            legend=dict(orientation="h", y=-0.2)
+            legend=dict(orientation="h", y=-0.2),
+            xaxis=dict(
+                showgrid=True,
+                gridwidth=1,
+                gridcolor='rgba(255,0,0,0.1)',
+                dtick=40,  # One small box in ECG paper 
+            ),
+            yaxis=dict(
+                showgrid=True,
+                gridwidth=1,
+                gridcolor='rgba(255,0,0,0.1)',
+                dtick=0.1,  # One small box for 0.1 mV
+                range=[y_min, y_max]
+            ),
+            plot_bgcolor='white'
         )
 
+        # Get x and y axis ranges from the data
+        x_start = min(time)
+        x_end = max(time)
+        y_start = min(ecg_cleaned)
+        y_end = max(ecg_cleaned)
+
+        # Bold vertical lines every 200 ms (5 × 40 ms)
+        for x in range(int(x_start), int(x_end) + 1, 200):
+            fig.add_shape(
+                type="line",
+                x0=x, x1=x,
+                y0=y_start, y1=y_end,
+                line=dict(color='rgba(255,0,0,0.5)', width=1.5),
+                layer="below"
+            )
+
+        # Bold horizontal lines every 0.5 mV (5 × 0.1 mV)
+        y_current = round(y_start - (y_start % 0.5), 2)
+        while y_current <= y_end:
+            fig.add_shape(
+                type="line",
+                x0=x_start, x1=x_end,
+                y0=y_current, y1=y_current,
+                line=dict(color='rgba(255,0,0,0.5)', width=1.5),
+                layer="below"
+            )
+            y_current = round(y_current + 0.5, 2)
+       
         return fig
