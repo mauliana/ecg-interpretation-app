@@ -154,15 +154,15 @@ if uploaded_files:
                         st.write(f"**{region}** Posterior descending (RCA or Circumflex)")
                     
                     # Print all lead combinations for this region
-                    # for leads in leads_list:
-                    #     st.markdown(f"- {', '.join(sorted(leads))}")
-                    st.markdown(leads_list)
+                    for leads in leads_list:
+                        st.markdown(f"- {', '.join(sorted(leads))}")
+                    # st.markdown(leads_list)
             else:
                 st.info("No ST elevation or depression in defined contiguous lead groups.")
             
             # Show full result table
-            st.markdown("**Detail information:**")
-            st.dataframe(df_status)
+            # st.markdown("**Detail information:**")
+            # st.dataframe(df_status)
     else:
         st.error("Please upload the matching .dat and .hea files for a single record.")
 
