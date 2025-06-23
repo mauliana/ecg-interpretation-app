@@ -99,8 +99,37 @@ if uploaded_files:
 
         ecg_signals, info = nk.ecg_process(signal, sampling_rate=sampling_rate)
 
+        # available_marks = ["Q peak", "R peak", "S peak", "T peak", "P peak", "J point", "ST eval point", "ST Elevation", "ST Depression"]
+        # visible_marks = st.multiselect("Select ECG markers to display:", options=available_marks, default=available_marks)
+        st.subheader("ECG Marker Display Options")
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
+            show_q = st.checkbox("Show Q peak", value=False)
+            show_r = st.checkbox("Show R peak", value=False)
+        with c2:
+            show_s = st.checkbox("Show S peak", value=False)
+            show_t = st.checkbox("Show T peak", value=False)
+        with c3:
+            show_p = st.checkbox("Show P peak", value=False)
+            show_j = st.checkbox("Show J point", value=False)
+        with c4:
+            show_st_elev = st.checkbox("Show ST Elevation", value=True)
+            show_st_depr = st.checkbox("Show ST Depression", value=True)
+            
+
+        visible_marks = []
+        if show_q: visible_marks.append("Q peak")
+        if show_r: visible_marks.append("R peak")
+        if show_s: visible_marks.append("S peak")
+        if show_t: visible_marks.append("T peak")
+        if show_p: visible_marks.append("P peak")
+        if show_j: visible_marks.append("J point")
+        if show_st_elev: visible_marks.append("ST Elevation")
+        if show_st_depr: visible_marks.append("ST Depression")
+
+        plot = tool.plot_lead(ecg_cleaned, time, waves, rpeaks, selected_lead, sampling_rate, lead_status, v_threshold, visible_marks)
         # plot = tool.plot_ecg_with_peaks(signal, sampling_rate, info, lead_name=selected_lead)
-        plot = tool.plot_lead(ecg_cleaned, time, waves, rpeaks, selected_lead, sampling_rate, lead_status, v_threshold)
+        # plot = tool.plot_lead(ecg_cleaned, time, waves, rpeaks, selected_lead, sampling_rate, lead_status, v_threshold)
         st.plotly_chart(plot, use_container_width=True)
         
         col1, col2 = st.columns([3, 2])

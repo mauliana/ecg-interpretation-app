@@ -130,11 +130,287 @@ class Tools:
     def clean(self, peaks):
         return np.array(peaks)[~np.isnan(peaks)].astype(int)
     
-    def plot_lead(self, ecg_cleaned, time, waves, rpeaks, lead_name, sampling_rate, lead_status, v_threshold):
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=time, y=ecg_cleaned, mode='lines', name='ECG Signal'))
+    # def plot_lead(self, ecg_cleaned, time, waves, rpeaks, lead_name, sampling_rate, lead_status, v_threshold):
+    #     fig = go.Figure()
+    #     fig.add_trace(go.Scatter(x=time, y=ecg_cleaned, mode='lines', name='ECG Signal'))
 
-        # --------- Global baseline ---------------
+    #     # --------- Global baseline ---------------
+    #     g_baseline = self.mi.global_baseline(ecg_cleaned, sampling_rate, waves, rpeaks)
+    #     if g_baseline != 0:
+    #         fig.add_trace(go.Scatter(
+    #             x=time,
+    #             y=[g_baseline] * len(time),
+    #             mode='lines',
+    #             line=dict(color='black', width=1, dash='dash'),
+    #             name="Global Baseline (PR segment)",
+    #             showlegend=True
+    #         ))
+
+    #     elev_threshold = v_threshold if lead_name in ["V2", "V3"] else 0.1
+    #     depression_threshold = 0.05
+    #     added_legend = {"elevation": False, "depression": False, "jpoint": False, "st-point": False,
+    #                     "qpeak": False, "rpeak": False, "speak": False, "tpeak":False,"ppeak": False}
+
+    #     # print(f"plot threshold {lead_name}: {elev_threshold}")
+    #     for i in range(len(rpeaks["ECG_R_Peaks"])):
+    #         try:
+    #             r_idx = int(rpeaks["ECG_R_Peaks"][i])
+    #             if r_idx >= len(ecg_cleaned):
+    #                 continue
+
+    #             # --- Q Peak ---
+    #             q_peak = int(waves["ECG_Q_Peaks"][i]) if not np.isnan(waves["ECG_Q_Peaks"][i]) else None
+    #             if q_peak is not None and q_peak < len(ecg_cleaned):
+    #                 fig.add_trace(go.Scatter(
+    #                     x=[time[q_peak]],
+    #                     y=[ecg_cleaned[q_peak]],
+    #                     mode='markers+text',
+    #                     marker=dict(color='blue', size=7, symbol='triangle-up'),
+    #                     text=["Q"],
+    #                     textposition="top center",
+    #                     name="Q peak" if not added_legend["qpeak"] else "",
+    #                     showlegend=not added_legend["qpeak"]
+    #                 ))
+    #                 added_legend["qpeak"] = True
+
+    #             # --- R Peak ---
+    #             fig.add_trace(go.Scatter(
+    #                 x=[time[r_idx]],
+    #                 y=[ecg_cleaned[r_idx]],
+    #                 mode='markers+text',
+    #                 marker=dict(color='purple', size=7, symbol='diamond'),
+    #                 text=["R"],
+    #                 textposition="top center",
+    #                 name="R peak" if not added_legend["rpeak"] else "",
+    #                 showlegend=not added_legend["rpeak"]
+    #             ))
+    #             added_legend["rpeak"] = True
+
+    #             # --- Prominent R ---
+    #             prom_threshold = 0.7 if lead_name in ["V1", "V2", "V3"] else 1.5
+    #             if ecg_cleaned[r_idx] > prom_threshold:
+    #                 fig.add_trace(go.Scatter(
+    #                     x=[time[r_idx]],
+    #                     y=[ecg_cleaned[r_idx]],
+    #                     mode='markers+text',
+    #                     marker=dict(color='yellow', size=10, symbol='star'),
+    #                     text=["Prominent R"],
+    #                     textposition="bottom center",
+    #                     name=f"Prominent R ({lead_name})" if not added_legend.get("prominent_r_" + lead_name, False) else "",
+    #                     showlegend=not added_legend.get("prominent_r_" + lead_name, False)
+    #                 ))
+    #                 added_legend["prominent_r_" + lead_name] = True
+
+    #             # --- S Peak ---
+    #             s_peak = int(waves["ECG_S_Peaks"][i]) if not np.isnan(waves["ECG_S_Peaks"][i]) else None
+    #             if s_peak is not None and s_peak < len(ecg_cleaned):
+    #                 fig.add_trace(go.Scatter(
+    #                     x=[time[s_peak]],
+    #                     y=[ecg_cleaned[s_peak]],
+    #                     mode='markers+text',
+    #                     marker=dict(color='orange', size=7, symbol='triangle-down'),
+    #                     text=["S"],
+    #                     textposition="bottom center",
+    #                     name="S peak" if not added_legend["speak"] else "",
+    #                     showlegend=not added_legend["speak"]
+    #                 ))
+    #                 added_legend["speak"] = True
+
+    #             # --- T Peak ---
+    #             t_peak = int(waves["ECG_T_Peaks"][i]) if not np.isnan(waves["ECG_T_Peaks"][i]) else None
+    #             if t_peak is not None and t_peak < len(ecg_cleaned):
+    #                 fig.add_trace(go.Scatter(
+    #                     x=[time[t_peak]],
+    #                     y=[ecg_cleaned[t_peak]],
+    #                     mode='markers+text',
+    #                     marker=dict(color='green', size=7),
+    #                     text=["T"],
+    #                     textposition="top center",
+    #                     name="T peak" if not added_legend["tpeak"] else "",
+    #                     showlegend=not added_legend["tpeak"]
+    #                 ))
+    #                 added_legend["tpeak"] = True
+
+    #             # --- P Peak ---
+    #             p_peak = int(waves["ECG_P_Peaks"][i]) if not np.isnan(waves["ECG_P_Peaks"][i]) else None
+    #             if p_peak is not None and p_peak < len(ecg_cleaned):
+    #                 fig.add_trace(go.Scatter(
+    #                     x=[time[p_peak]],
+    #                     y=[ecg_cleaned[p_peak]],
+    #                     mode='markers+text',
+    #                     marker=dict(color='pink', size=7),
+    #                     text=["P"],
+    #                     textposition="top center",
+    #                     name="P peak" if not added_legend["ppeak"] else "",
+    #                     showlegend=not added_legend["ppeak"]
+    #                 ))
+    #                 added_legend["ppeak"] = True
+
+    #             # --- J point ---
+    #             j_point = int(waves["ECG_R_Offsets"][i]) if not np.isnan(waves["ECG_R_Offsets"][i]) else None
+    #             # j_point = s_peak
+    #             if j_point is None or j_point >= len(ecg_cleaned):
+    #                 continue
+
+    #             fig.add_trace(go.Scatter(
+    #                 x=[time[j_point]],
+    #                 y=[ecg_cleaned[j_point]],
+    #                 mode='markers+text',
+    #                 marker=dict(color='gray', size=7),
+    #                 text=["J"],
+    #                 textposition="top center",
+    #                 name="J point" if not added_legend["jpoint"] else "",
+    #                 showlegend=not added_legend["jpoint"]
+    #             ))
+    #             added_legend["jpoint"] = True
+
+    #             # --- Baseline from PR segment ---
+    #             p_offset = int(waves["ECG_P_Offsets"][i]) if not np.isnan(waves["ECG_P_Offsets"][i]) else None
+    #             q_peak = int(waves["ECG_Q_Peaks"][i]) if not np.isnan(waves["ECG_Q_Peaks"][i]) else None
+    #             if q_peak is None or q_peak >= len(ecg_cleaned):
+    #                 continue
+
+    #             baseline_start = p_offset if (p_offset is not None and p_offset < q_peak) else max(0, q_peak - int(0.04 * sampling_rate))
+    #             baseline_end = q_peak
+
+    #             baseline_window = ecg_cleaned[baseline_start:baseline_end]
+    #             if len(baseline_window) == 0:
+    #                 continue
+
+    #             baseline_mean = np.mean(baseline_window)
+
+    #             # --- ST value at 80ms after J-point ---
+    #             st_eval_offset = j_point + int(0.08 * sampling_rate)
+    #             if st_eval_offset >= len(ecg_cleaned):
+    #                 continue
+
+    #             st_value = ecg_cleaned[st_eval_offset]
+    #             deviation = st_value - baseline_mean
+    #             # deviation = st_value - g_baseline
+
+    #             # --- Optional: Mark ST eval point at 80ms ---
+    #             fig.add_trace(go.Scatter(
+    #                 x=[time[st_eval_offset]],
+    #                 y=[st_value],
+    #                 mode='markers+text',
+    #                 marker=dict(color='blue', size=6),
+    #                 # text=["ST@80ms"],
+    #                 textposition="bottom center",
+    #                 name="ST eval point (80 ms)" if not added_legend["st-point"] else "",
+    #                 showlegend=not added_legend["st-point"]
+    #             ))
+    #             added_legend["st-point"] = True
+
+    #             if deviation >= elev_threshold:
+    #                 color, fill, name = 'red', 'rgba(255,0,0,0.2)', "ST Elevation"
+    #                 show_legend = not added_legend["elevation"]
+    #                 added_legend["elevation"] = True
+    #             elif deviation <= -depression_threshold:
+    #                 color, fill, name = 'green', 'rgba(0,255,0,0.2)', "ST Depression"
+    #                 show_legend = not added_legend["depression"]
+    #                 added_legend["depression"] = True
+    #             else:
+    #                 continue  # No elevation/depression
+
+    #             # --- Always visualize 80ms of ST segment after J-point ---
+    #             st_duration_samples = int(0.08 * sampling_rate)
+    #             t_onset = min(j_point + st_duration_samples, len(ecg_cleaned) - 1)
+
+    #             x_vals = list(time[j_point:t_onset])
+    #             y_vals = list(ecg_cleaned[j_point:t_onset])
+
+    #             x_poly = x_vals + x_vals[::-1]
+    #             y_poly = y_vals + [baseline_mean] * len(y_vals)
+
+    #             fig.add_trace(go.Scatter(
+    #                 x=x_poly,
+    #                 y=y_poly,
+    #                 mode='lines',
+    #                 line=dict(color=color),
+    #                 fill='toself',
+    #                 fillcolor=fill,
+    #                 name=name,
+    #                 showlegend=show_legend
+    #             ))
+
+    #             fig.add_trace(go.Scatter(
+    #                 x=x_vals,
+    #                 y=y_vals,
+    #                 mode='lines',
+    #                 line=dict(color=color, width=1),
+    #                 name=name,
+    #                 showlegend=False
+    #             ))
+
+    #         except Exception as e:
+    #             print(f"Error in beat {i}: {e}")
+    #             continue
+
+    #     y_margin = 0.1
+    #     y_min = min(ecg_cleaned) - y_margin
+    #     y_max = max(ecg_cleaned) + y_margin
+
+    #     fig.update_layout(
+    #         title=f"Lead {lead_name}",
+    #         xaxis_title="Time (ms)",
+    #         yaxis_title="Amplitude (mV)",
+    #         legend=dict(orientation="h", y=-0.2),
+    #         xaxis=dict(
+    #             showgrid=True,
+    #             gridwidth=1,
+    #             gridcolor='rgba(255,0,0,0.1)',
+    #             dtick=40,  # One small box in ECG paper 
+    #         ),
+    #         yaxis=dict(
+    #             showgrid=True,
+    #             gridwidth=1,
+    #             gridcolor='rgba(255,0,0,0.1)',
+    #             dtick=0.1,  # One small box for 0.1 mV
+    #             range=[y_min, y_max]
+    #         ),
+    #         plot_bgcolor='white'
+    #     )
+
+    #     # Get x and y axis ranges from the data
+    #     x_start = min(time)
+    #     x_end = max(time)
+    #     y_start = min(ecg_cleaned)
+    #     y_end = max(ecg_cleaned)
+
+    #     # Bold vertical lines every 200 ms (5 × 40 ms)
+    #     for x in range(int(x_start), int(x_end) + 1, 200):
+    #         fig.add_shape(
+    #             type="line",
+    #             x0=x, x1=x,
+    #             y0=y_start, y1=y_end,
+    #             line=dict(color='rgba(255,0,0,0.5)', width=1.5),
+    #             layer="below"
+    #         )
+
+    #     # Bold horizontal lines every 0.5 mV (5 × 0.1 mV)
+    #     y_current = round(y_start - (y_start % 0.5), 2)
+    #     while y_current <= y_end:
+    #         fig.add_shape(
+    #             type="line",
+    #             x0=x_start, x1=x_end,
+    #             y0=y_current, y1=y_current,
+    #             line=dict(color='rgba(255,0,0,0.5)', width=1.5),
+    #             layer="below"
+    #         )
+    #         y_current = round(y_current + 0.5, 2)
+       
+    #     return fig
+
+    def plot_lead(self, ecg_cleaned, time, waves, rpeaks, lead_name, sampling_rate, lead_status, v_threshold, visible_marks):
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=time,
+            y=ecg_cleaned,
+            mode='lines',
+            name='ECG Signal',
+            legendgroup='ECG Signal'
+        ))
+
         g_baseline = self.mi.global_baseline(ecg_cleaned, sampling_rate, waves, rpeaks)
         if g_baseline != 0:
             fig.add_trace(go.Scatter(
@@ -143,15 +419,15 @@ class Tools:
                 mode='lines',
                 line=dict(color='black', width=1, dash='dash'),
                 name="Global Baseline (PR segment)",
-                showlegend=True
+                showlegend=True,
+                legendgroup="Baseline"
             ))
 
         elev_threshold = v_threshold if lead_name in ["V2", "V3"] else 0.1
         depression_threshold = 0.05
         added_legend = {"elevation": False, "depression": False, "jpoint": False, "st-point": False,
-                        "qpeak": False, "rpeak": False, "speak": False, "tpeak":False,"ppeak": False}
+                        "qpeak": False, "rpeak": False, "speak": False, "tpeak": False, "ppeak": False}
 
-        # print(f"plot threshold {lead_name}: {elev_threshold}")
         for i in range(len(rpeaks["ECG_R_Peaks"])):
             try:
                 r_idx = int(rpeaks["ECG_R_Peaks"][i])
@@ -160,7 +436,7 @@ class Tools:
 
                 # --- Q Peak ---
                 q_peak = int(waves["ECG_Q_Peaks"][i]) if not np.isnan(waves["ECG_Q_Peaks"][i]) else None
-                if q_peak is not None and q_peak < len(ecg_cleaned):
+                if "Q peak" in visible_marks and q_peak is not None and q_peak < len(ecg_cleaned):
                     fig.add_trace(go.Scatter(
                         x=[time[q_peak]],
                         y=[ecg_cleaned[q_peak]],
@@ -168,23 +444,26 @@ class Tools:
                         marker=dict(color='blue', size=7, symbol='triangle-up'),
                         text=["Q"],
                         textposition="top center",
-                        name="Q peak" if not added_legend["qpeak"] else "",
+                        name="Q peak",
+                        legendgroup="Q peak",
                         showlegend=not added_legend["qpeak"]
                     ))
                     added_legend["qpeak"] = True
 
                 # --- R Peak ---
-                fig.add_trace(go.Scatter(
-                    x=[time[r_idx]],
-                    y=[ecg_cleaned[r_idx]],
-                    mode='markers+text',
-                    marker=dict(color='purple', size=7, symbol='diamond'),
-                    text=["R"],
-                    textposition="top center",
-                    name="R peak" if not added_legend["rpeak"] else "",
-                    showlegend=not added_legend["rpeak"]
-                ))
-                added_legend["rpeak"] = True
+                if "R peak" in visible_marks:
+                    fig.add_trace(go.Scatter(
+                        x=[time[r_idx]],
+                        y=[ecg_cleaned[r_idx]],
+                        mode='markers+text',
+                        marker=dict(color='purple', size=7, symbol='diamond'),
+                        text=["R"],
+                        textposition="top center",
+                        name="R peak",
+                        legendgroup="R peak",
+                        showlegend=not added_legend["rpeak"]
+                    ))
+                    added_legend["rpeak"] = True
 
                 # --- Prominent R ---
                 prom_threshold = 0.7 if lead_name in ["V1", "V2", "V3"] else 1.5
@@ -196,14 +475,15 @@ class Tools:
                         marker=dict(color='yellow', size=10, symbol='star'),
                         text=["Prominent R"],
                         textposition="bottom center",
-                        name=f"Prominent R ({lead_name})" if not added_legend.get("prominent_r_" + lead_name, False) else "",
+                        name=f"Prominent R ({lead_name})",
+                        legendgroup=f"Prominent R ({lead_name})",
                         showlegend=not added_legend.get("prominent_r_" + lead_name, False)
                     ))
                     added_legend["prominent_r_" + lead_name] = True
 
                 # --- S Peak ---
                 s_peak = int(waves["ECG_S_Peaks"][i]) if not np.isnan(waves["ECG_S_Peaks"][i]) else None
-                if s_peak is not None and s_peak < len(ecg_cleaned):
+                if "S peak" in visible_marks and s_peak is not None and s_peak < len(ecg_cleaned):
                     fig.add_trace(go.Scatter(
                         x=[time[s_peak]],
                         y=[ecg_cleaned[s_peak]],
@@ -211,14 +491,15 @@ class Tools:
                         marker=dict(color='orange', size=7, symbol='triangle-down'),
                         text=["S"],
                         textposition="bottom center",
-                        name="S peak" if not added_legend["speak"] else "",
+                        name="S peak",
+                        legendgroup="S peak",
                         showlegend=not added_legend["speak"]
                     ))
                     added_legend["speak"] = True
 
                 # --- T Peak ---
                 t_peak = int(waves["ECG_T_Peaks"][i]) if not np.isnan(waves["ECG_T_Peaks"][i]) else None
-                if t_peak is not None and t_peak < len(ecg_cleaned):
+                if "T peak" in visible_marks and t_peak is not None and t_peak < len(ecg_cleaned):
                     fig.add_trace(go.Scatter(
                         x=[time[t_peak]],
                         y=[ecg_cleaned[t_peak]],
@@ -226,14 +507,15 @@ class Tools:
                         marker=dict(color='green', size=7),
                         text=["T"],
                         textposition="top center",
-                        name="T peak" if not added_legend["tpeak"] else "",
+                        name="T peak",
+                        legendgroup="T peak",
                         showlegend=not added_legend["tpeak"]
                     ))
                     added_legend["tpeak"] = True
 
                 # --- P Peak ---
                 p_peak = int(waves["ECG_P_Peaks"][i]) if not np.isnan(waves["ECG_P_Peaks"][i]) else None
-                if p_peak is not None and p_peak < len(ecg_cleaned):
+                if "P peak" in visible_marks and p_peak is not None and p_peak < len(ecg_cleaned):
                     fig.add_trace(go.Scatter(
                         x=[time[p_peak]],
                         y=[ecg_cleaned[p_peak]],
@@ -241,28 +523,30 @@ class Tools:
                         marker=dict(color='pink', size=7),
                         text=["P"],
                         textposition="top center",
-                        name="P peak" if not added_legend["ppeak"] else "",
+                        name="P peak",
+                        legendgroup="P peak",
                         showlegend=not added_legend["ppeak"]
                     ))
                     added_legend["ppeak"] = True
 
                 # --- J point ---
                 j_point = int(waves["ECG_R_Offsets"][i]) if not np.isnan(waves["ECG_R_Offsets"][i]) else None
-                # j_point = s_peak
                 if j_point is None or j_point >= len(ecg_cleaned):
                     continue
 
-                fig.add_trace(go.Scatter(
-                    x=[time[j_point]],
-                    y=[ecg_cleaned[j_point]],
-                    mode='markers+text',
-                    marker=dict(color='gray', size=7),
-                    text=["J"],
-                    textposition="top center",
-                    name="J point" if not added_legend["jpoint"] else "",
-                    showlegend=not added_legend["jpoint"]
-                ))
-                added_legend["jpoint"] = True
+                if "J point" in visible_marks:
+                    fig.add_trace(go.Scatter(
+                        x=[time[j_point]],
+                        y=[ecg_cleaned[j_point]], 
+                        mode='markers+text',
+                        marker=dict(color='gray', size=7),
+                        text=["J"],
+                        textposition="top center",
+                        name="J point",
+                        legendgroup="J point",
+                        showlegend=not added_legend["jpoint"]
+                    ))
+                    added_legend["jpoint"] = True
 
                 # --- Baseline from PR segment ---
                 p_offset = int(waves["ECG_P_Offsets"][i]) if not np.isnan(waves["ECG_P_Offsets"][i]) else None
@@ -279,40 +563,37 @@ class Tools:
 
                 baseline_mean = np.mean(baseline_window)
 
-                # --- ST value at 80ms after J-point ---
+                # --- ST eval point (80ms after J-point) ---
                 st_eval_offset = j_point + int(0.08 * sampling_rate)
                 if st_eval_offset >= len(ecg_cleaned):
                     continue
 
                 st_value = ecg_cleaned[st_eval_offset]
                 deviation = st_value - baseline_mean
-                # deviation = st_value - g_baseline
 
-                # --- Optional: Mark ST eval point at 80ms ---
                 fig.add_trace(go.Scatter(
                     x=[time[st_eval_offset]],
                     y=[st_value],
                     mode='markers+text',
                     marker=dict(color='blue', size=6),
-                    # text=["ST@80ms"],
                     textposition="bottom center",
-                    name="ST eval point (80 ms)" if not added_legend["st-point"] else "",
+                    name="ST eval point (80 ms)",
+                    legendgroup="ST eval point",
                     showlegend=not added_legend["st-point"]
                 ))
                 added_legend["st-point"] = True
 
-                if deviation >= elev_threshold:
+                if "ST Elevation" in visible_marks and deviation >= elev_threshold:
                     color, fill, name = 'red', 'rgba(255,0,0,0.2)', "ST Elevation"
                     show_legend = not added_legend["elevation"]
                     added_legend["elevation"] = True
-                elif deviation <= -depression_threshold:
+                elif "ST Depression" in visible_marks and deviation <= -depression_threshold:
                     color, fill, name = 'green', 'rgba(0,255,0,0.2)', "ST Depression"
                     show_legend = not added_legend["depression"]
                     added_legend["depression"] = True
                 else:
-                    continue  # No elevation/depression
+                    continue
 
-                # --- Always visualize 80ms of ST segment after J-point ---
                 st_duration_samples = int(0.08 * sampling_rate)
                 t_onset = min(j_point + st_duration_samples, len(ecg_cleaned) - 1)
 
@@ -330,6 +611,7 @@ class Tools:
                     fill='toself',
                     fillcolor=fill,
                     name=name,
+                    legendgroup=name,
                     showlegend=show_legend
                 ))
 
@@ -339,20 +621,13 @@ class Tools:
                     mode='lines',
                     line=dict(color=color, width=1),
                     name=name,
+                    legendgroup=name,
                     showlegend=False
                 ))
 
             except Exception as e:
                 print(f"Error in beat {i}: {e}")
                 continue
-
-        # fig.update_layout(
-        #     title=f"Lead {lead_name}",
-        #     xaxis_title="Time (ms)",
-        #     yaxis_title="Amplitude (mV)",
-        #     template="plotly_white",
-        #     legend=dict(orientation="h", y=-0.2)
-        # )
 
         y_margin = 0.1
         y_min = min(ecg_cleaned) - y_margin
@@ -367,25 +642,23 @@ class Tools:
                 showgrid=True,
                 gridwidth=1,
                 gridcolor='rgba(255,0,0,0.1)',
-                dtick=40,  # One small box in ECG paper 
+                dtick=40,
             ),
             yaxis=dict(
                 showgrid=True,
                 gridwidth=1,
                 gridcolor='rgba(255,0,0,0.1)',
-                dtick=0.1,  # One small box for 0.1 mV
+                dtick=0.1,
                 range=[y_min, y_max]
             ),
             plot_bgcolor='white'
         )
 
-        # Get x and y axis ranges from the data
         x_start = min(time)
         x_end = max(time)
         y_start = min(ecg_cleaned)
         y_end = max(ecg_cleaned)
 
-        # Bold vertical lines every 200 ms (5 × 40 ms)
         for x in range(int(x_start), int(x_end) + 1, 200):
             fig.add_shape(
                 type="line",
@@ -395,7 +668,6 @@ class Tools:
                 layer="below"
             )
 
-        # Bold horizontal lines every 0.5 mV (5 × 0.1 mV)
         y_current = round(y_start - (y_start % 0.5), 2)
         while y_current <= y_end:
             fig.add_shape(
@@ -406,5 +678,5 @@ class Tools:
                 layer="below"
             )
             y_current = round(y_current + 0.5, 2)
-       
+
         return fig
