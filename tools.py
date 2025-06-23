@@ -571,17 +571,17 @@ class Tools:
                 st_value = ecg_cleaned[st_eval_offset]
                 deviation = st_value - baseline_mean
 
-                fig.add_trace(go.Scatter(
-                    x=[time[st_eval_offset]],
-                    y=[st_value],
-                    mode='markers+text',
-                    marker=dict(color='blue', size=6),
-                    textposition="bottom center",
-                    name="ST eval point (80 ms)",
-                    legendgroup="ST eval point",
-                    showlegend=not added_legend["st-point"]
-                ))
-                added_legend["st-point"] = True
+                # fig.add_trace(go.Scatter(
+                #     x=[time[st_eval_offset]],
+                #     y=[st_value],
+                #     mode='markers+text',
+                #     marker=dict(color='blue', size=6),
+                #     textposition="bottom center",
+                #     name="ST eval point (80 ms)",
+                #     legendgroup="ST eval point",
+                #     showlegend=not added_legend["st-point"]
+                # ))
+                # added_legend["st-point"] = True
 
                 if "ST Elevation" in visible_marks and deviation >= elev_threshold:
                     color, fill, name = 'red', 'rgba(255,0,0,0.2)', "ST Elevation"
